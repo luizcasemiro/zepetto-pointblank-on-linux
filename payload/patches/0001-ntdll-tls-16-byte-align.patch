@@ -1,0 +1,79 @@
+--- a/dlls/ntdll/loader.c	2024-01-16 17:55:47.000000000 -0300
++++ b/dlls/ntdll/loader.c	2026-11-12 14:24:12.210493237 -0300
+@@ -1272,6 +1272,37 @@
+     return TRUE;
+ }
+ 
++/***********************************************************************
++ *           tls_block_alloc / tls_block_free
++ *
++ * Windows guarantees that the per-module TLS data block (the one stored in
++ * TEB->ThreadLocalStoragePointer[index]) is 16-byte aligned; some binaries
++ * rely on it and use SSE instructions on the block.  The 32-bit Wine heap
++ * only aligns to BLOCK_ALIGN == 2*sizeof(void*) == 8, so allocate a bit more
++ * and keep the raw pointer in the word right before the aligned block.  Every
++ * free path must go through tls_block_free() to recover that raw pointer.
++ */
++#define TLS_BLOCK_ALIGN 16
++
++static void *tls_block_alloc( SIZE_T size )
++{
++    void *raw, *ptr;
++
++    if (!(raw = RtlAllocateHeap( GetProcessHeap(), 0,
++                                 size + TLS_BLOCK_ALIGN + sizeof(void *) ))) return NULL;
++    ptr = (void *)(((ULONG_PTR)raw + sizeof(void *) + TLS_BLOCK_ALIGN - 1) &
++                   ~(ULONG_PTR)(TLS_BLOCK_ALIGN - 1));
++    ((void **)ptr)[-1] = raw;
++    TRACE( "tls block raw %p -> aligned %p (mod16 %lu)\n", raw, ptr, (ULONG)((ULONG_PTR)ptr & 15) );
++    return ptr;
++}
++
++static void tls_block_free( void *ptr )
++{
++    if (!ptr) return;
++    RtlFreeHeap( GetProcessHeap(), 0, ((void **)ptr)[-1] );
++}
++
+ /*************************************************************************
+  *		alloc_tls_slot
+  *
+@@ -1339,15 +1370,14 @@
+     {
+         TEB *teb = CONTAINING_RECORD( entry, TEB, TlsLinks );
+ 
+-        if (!(new_ptr = RtlAllocateHeap( GetProcessHeap(), 0, size + dir->SizeOfZeroFill ))) return -1;
++        if (!(new_ptr = tls_block_alloc( size + dir->SizeOfZeroFill ))) return FALSE;
+         memcpy( new_ptr, (void *)dir->StartAddressOfRawData, size );
+         memset( (char *)new_ptr + size, 0, dir->SizeOfZeroFill );
+ 
+         TRACE( "thread %04lx slot %lu: %lu/%lu bytes at %p\n",
+                HandleToULong(teb->ClientId.UniqueThread), i, size, dir->SizeOfZeroFill, new_ptr );
+ 
+-        RtlFreeHeap( GetProcessHeap(), 0,
+-                     InterlockedExchangePointer( (void **)teb->ThreadLocalStoragePointer + i, new_ptr ));
++        tls_block_free( InterlockedExchangePointer( (void **)teb->ThreadLocalStoragePointer + i, new_ptr ));
+     }
+ 
+     *(DWORD *)dir->AddressOfIndex = i;
+@@ -1563,9 +1593,9 @@
+         size = dir->EndAddressOfRawData - dir->StartAddressOfRawData;
+         if (!size && !dir->SizeOfZeroFill) continue;
+ 
+-        if (!(pointers[i] = RtlAllocateHeap( GetProcessHeap(), 0, size + dir->SizeOfZeroFill )))
++        if (!(pointers[i] = tls_block_alloc( size + dir->SizeOfZeroFill )))
+         {
+-            while (i) RtlFreeHeap( GetProcessHeap(), 0, pointers[--i] );
++            while (i) tls_block_free( pointers[--i] );
+             RtlFreeHeap( GetProcessHeap(), 0, pointers );
+             return STATUS_NO_MEMORY;
+         }
+@@ -3877,7 +3907,7 @@
+     if (NtCurrentTeb()->TlsLinks.Flink) RemoveEntryList( &NtCurrentTeb()->TlsLinks );
+     if ((pointers = NtCurrentTeb()->ThreadLocalStoragePointer))
+     {
+-        for (i = 0; i < tls_module_count; i++) RtlFreeHeap( GetProcessHeap(), 0, pointers[i] );
++        for (i = 0; i < tls_module_count; i++) tls_block_free( pointers[i] );
+         RtlFreeHeap( GetProcessHeap(), 0, pointers );
+     }
+     RtlProcessFlsData( NtCurrentTeb()->FlsSlots, 2 );

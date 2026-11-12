@@ -1,0 +1,32 @@
+--- a/dlls/gdi32/uniscribe/usp10.c	2024-01-16 17:55:47.000000000 -0300
++++ b/dlls/gdi32/uniscribe/usp10.c	2026-11-12 16:42:05.662789273 -0300
+@@ -3256,6 +3256,16 @@
+ 
+     if (SUCCEEDED(hr))
+     {
++        WCHAR face[LF_FACESIZE] = {0};
++        char buf[160];
++        int n = min(cChars, 40), k = 0;
++        GetTextFaceW(hdc, LF_FACESIZE, face);
++        for (i = 0; i < n && k < (int)sizeof(buf) - 4; i++)
++            k += sprintf(buf + k, "%02x", pwcChars[i]);
++        buf[k] = 0;
++        TRACE("SHAPE face=%ls script=%d chars=%d text=%s glyphs=", face, psa->eScript, cChars, buf);
++        for (i = 0; i < *pcGlyphs && i < 40; i++) TRACE("%u,", pwOutGlyphs[i]);
++        TRACE("\n");
+         for (i = 0; i < *pcGlyphs; i++)
+             psva[i] = glyphProps[i].sva;
+     }
+@@ -3524,6 +3534,12 @@
+ 
+     fuOptions &= ETO_CLIPPED | ETO_OPAQUE;
+     fuOptions |= ETO_IGNORELANGUAGE;
++    /* ScriptTextOut may be called with an empty script cache (the caller just
++     * passes the glyph indices it got from ScriptShape).  Windows uses glyph
++     * indices in that case; without initializing the cache here Wine would
++     * silently draw the glyph indices as character codes instead. */
++    if (!psa->fNoGlyphIndex && !*psc)
++        init_script_cache(hdc, psc);
+     if (!psa->fNoGlyphIndex && *psc && ((ScriptCache *)*psc)->sfnt)
+         fuOptions |= ETO_GLYPH_INDEX; /* We do actually have glyph indices */
+ 

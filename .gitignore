@@ -1,0 +1,21 @@
+# Binários grandes / conteúdo de terceiros (não versionar)
+payload/*.tar.xz
+payload/*.exe
+payload/*.tar.gz
+!payload/patches/
+
+# Jogo e prefixos locais
+*.bin
+*.wine-pb*
+wine-tls/
+dist/
+
+# Logs e temporários
+*.log
+instalacao*.log
+saida-*.log
+*~
+
+# Sistema
+.DS_Store
+Thumbs.db

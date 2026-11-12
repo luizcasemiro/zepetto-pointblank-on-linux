@@ -1,0 +1,5 @@
+*.patch text eol=lf
+*.sh text eol=lf
+*.service.in text eol=lf
+*.desktop.in text eol=lf
+*.png binary

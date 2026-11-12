@@ -1,0 +1,17 @@
+[Unit]
+Description=Ponte HTTP->HTTPS do patch server do Point Blank (Wine)
+Documentation=file://@@LOCAL@@/LEIA-ME.txt
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=@@PYTHON@@ @@LOCAL@@/pb-bridge.py
+Restart=always
+RestartSec=2
+# a ponte escuta so em 127.0.0.1:8443
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Point Blank
+Name[pt_BR]=Point Blank
+GenericName=Jogo de tiro (Wine)
+Comment=Point Blank BR rodando sob Wine, com as correcoes de TLS e texto
+Exec=@@EXEC@@
+Icon=@@ICON@@
+Terminal=false
+Categories=Game;ActionGame;
+Keywords=pb;point;blank;fps;wine;zepetto;
+StartupNotify=true
+StartupWMClass=pblauncher.exe

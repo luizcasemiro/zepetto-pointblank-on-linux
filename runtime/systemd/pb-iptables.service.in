@@ -1,0 +1,13 @@
+[Unit]
+Description=Regras iptables para a ponte do patch server do Point Blank
+After=network-online.target pb-bridge.service
+Requires=pb-bridge.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=@@LOCAL@@/iptables-pb.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
